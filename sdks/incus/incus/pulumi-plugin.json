@@ -1,0 +1,10 @@
+{
+  "resource": true,
+  "name": "terraform-provider",
+  "version": "1.0.1",
+  "parameterization": {
+    "name": "incus",
+    "version": "1.0.0",
+    "value": "eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL2x4Yy9pbmN1cyIsInZlcnNpb24iOiIxLjAuMCJ9fQ=="
+  }
+}

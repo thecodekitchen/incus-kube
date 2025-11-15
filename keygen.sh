@@ -1,0 +1,1 @@
+ssh-keygen -t ed25519 -f ./pulumi_key -N ""

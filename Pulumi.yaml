@@ -1,0 +1,13 @@
+name: incus-kube
+description: A kube made of incus instances!
+runtime: go
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: kubernetes-go
+packages:
+  incus:
+    source: terraform-provider
+    version: 1.0.1
+    parameters:
+      - lxc/incus
