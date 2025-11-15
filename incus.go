@@ -104,8 +104,7 @@ func LaunchVMs(ctx *pulumi.Context) (IncusNodes, error) {
 		Create: pulumi.String("sudo ufw allow in on k8s-net"),
 		Delete: pulumi.String("sudo ufw delete allow in on k8s-net"),
 	}, pulumi.DependsOn([]pulumi.Resource{
-		kubeNetwork, // <-- !! UNCOMMENT THIS !!
-		// Make this depend on your actual Incus network resource.
+		kubeNetwork,
 	}))
 	if err != nil {
 		return IncusNodes{}, err
@@ -148,14 +147,14 @@ func LaunchVMs(ctx *pulumi.Context) (IncusNodes, error) {
 	masterNode, err := incus.NewInstance(ctx, "master-node", &incus.InstanceArgs{
 		Name:      pulumi.String("kube-master"),
 		Image:     pulumi.String("images:archlinux/cloud"),
-		Type:      pulumi.String("virtual-machine"), // Specify VM
+		Type:      pulumi.String("virtual-machine"),
 		Ephemeral: pulumi.Bool(false),
 		Devices:   vmDevices,
 		Config: pulumi.StringMap{
 			"user.user-data":      archCloudConfig,
-			"security.secureboot": pulumi.String("false"), // <-- THIS IS THE FIX
-			"limits.cpu":          pulumi.String("2"),     // <-- ADD THIS
-			"limits.memory":       pulumi.String("2GB"),   // <-- ADD THIS
+			"security.secureboot": pulumi.String("false"),
+			"limits.cpu":          pulumi.String("2"),
+			"limits.memory":       pulumi.String("2GB"),
 		},
 	}, pulumi.DependsOn([]pulumi.Resource{firewallRule}))
 	if err != nil {
@@ -165,14 +164,14 @@ func LaunchVMs(ctx *pulumi.Context) (IncusNodes, error) {
 	// 5. Create the Worker Node (Ubuntu)
 	workerNode1, err := incus.NewInstance(ctx, "worker-node-1", &incus.InstanceArgs{
 		Name:      pulumi.String("kube-worker-1"),
-		Image:     pulumi.String("images:ubuntu/25.04/cloud"), // Ubuntu LTS
+		Image:     pulumi.String("images:ubuntu/25.04/cloud"),
 		Type:      pulumi.String("virtual-machine"),
 		Ephemeral: pulumi.Bool(false),
 		Devices:   vmDevices,
 		Config: pulumi.StringMap{
 			"user.user-data": ubuntuCloudConfig,
-			"limits.cpu":     pulumi.String("2"),   // <-- ADD THIS
-			"limits.memory":  pulumi.String("2GB"), // <-- ADD THIS
+			"limits.cpu":     pulumi.String("2"),
+			"limits.memory":  pulumi.String("2GB"),
 		},
 	}, pulumi.DependsOn([]pulumi.Resource{firewallRule}))
 	if err != nil {
@@ -182,7 +181,7 @@ func LaunchVMs(ctx *pulumi.Context) (IncusNodes, error) {
 	// 6. Create the Worker Node (AlmaLinux)
 	workerNode2, err := incus.NewInstance(ctx, "worker-node-2", &incus.InstanceArgs{
 		Name:      pulumi.String("kube-worker-2"),
-		Image:     pulumi.String("images:almalinux/9/cloud"), // AlmaLinux 9
+		Image:     pulumi.String("images:almalinux/9/cloud"),
 		Type:      pulumi.String("virtual-machine"),
 		Ephemeral: pulumi.Bool(false),
 		Devices: incus.InstanceDeviceArray{
@@ -203,7 +202,7 @@ func LaunchVMs(ctx *pulumi.Context) (IncusNodes, error) {
 					"network": kubeNetwork.Name,
 				},
 			},
-			// === THIS IS THE FIX ===
+
 			// Add the agent:config disk for cloud-init
 			&incus.InstanceDeviceArgs{
 				Name: pulumi.String("agent"),
@@ -215,8 +214,8 @@ func LaunchVMs(ctx *pulumi.Context) (IncusNodes, error) {
 		},
 		Config: pulumi.StringMap{
 			"user.user-data": almaCloudConfig,
-			"limits.cpu":     pulumi.String("2"),   // <-- ADD THIS
-			"limits.memory":  pulumi.String("2GB"), // <-- ADD THIS
+			"limits.cpu":     pulumi.String("2"),
+			"limits.memory":  pulumi.String("2GB"),
 		},
 	}, pulumi.DependsOn([]pulumi.Resource{firewallRule}))
 	if err != nil {

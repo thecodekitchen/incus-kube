@@ -26,12 +26,11 @@ func SetupKube(ctx *pulumi.Context, vm_stack IncusNodes) (*kubernetes.Provider, 
 	masterSshReady, err := remote.NewCommand(ctx, "wait-for-master-ssh", &remote.CommandArgs{
 		Connection: masterConn,
 		Create:     pulumi.String("echo 'SSH is ready'"),
-	}, pulumi.DependsOn([]pulumi.Resource{vm_stack.MasterArchNode})) // Depends on the VM
+	}, pulumi.DependsOn([]pulumi.Resource{vm_stack.MasterArchNode}))
 	if err != nil {
 		return &kubernetes.Provider{}, err
 	}
 
-	// === NEW: Reboot the node to load the new kernel ===
 	// This depends on the first SSH wait.
 	// We run the reboot in the background (&) so the command exits 0
 	// and Pulumi doesn't see a "failed" SSH connection.
@@ -43,7 +42,6 @@ func SetupKube(ctx *pulumi.Context, vm_stack IncusNodes) (*kubernetes.Provider, 
 		return &kubernetes.Provider{}, err
 	}
 
-	// === NEW: Wait for SSH *after* the reboot ===
 	// This depends on the reboot command. It will start polling.
 	// The provider's `DialErrorLimit` will handle the "connection refused"
 	// retries until the VM is back up.
@@ -54,7 +52,7 @@ func SetupKube(ctx *pulumi.Context, vm_stack IncusNodes) (*kubernetes.Provider, 
 	if err != nil {
 		return &kubernetes.Provider{}, err
 	}
-	// This command installs K8s prerequisites and runs 'kubeadm init'
+	// This command installs K8s prerequisites and runs the k3s installer.
 	// We add a 'dependsOn' to ensure it only runs after the VM is ready.
 	kubeInitCmd, err := remote.NewCommand(ctx, "kube-init", &remote.CommandArgs{
 		Connection: masterConn,
@@ -76,7 +74,6 @@ func SetupKube(ctx *pulumi.Context, vm_stack IncusNodes) (*kubernetes.Provider, 
 		return &kubernetes.Provider{}, err
 	}
 	k3sUrl := pulumi.Sprintf("https://%s:6443", vm_stack.MasterArchNode.Ipv4Address)
-	// === NEW: Get Kubeconfig from Master ===
 	// This command cats the admin config and its output is used by the K8s provider
 	getKubeconfigCmd, err := remote.NewCommand(ctx, "get-kubeconfig", &remote.CommandArgs{
 		Connection: masterConn,
@@ -93,8 +90,6 @@ func SetupKube(ctx *pulumi.Context, vm_stack IncusNodes) (*kubernetes.Provider, 
 	}
 
 	// Get the join command from the master
-	// This command depends on the 'kubeInitCmd' completing successfully.
-	// --- 6. Get Join Token ---
 	getJoinTokenCmd, err := remote.NewCommand(ctx, "get-join-token", &remote.CommandArgs{
 		Connection: masterConn,
 		Create:     pulumi.Sprintf("sudo cat /var/lib/rancher/k3s/server/node-token\n"),
@@ -113,7 +108,7 @@ func SetupKube(ctx *pulumi.Context, vm_stack IncusNodes) (*kubernetes.Provider, 
 	worker1SshReady, err := remote.NewCommand(ctx, "wait-for-worker1-ssh", &remote.CommandArgs{
 		Connection: worker1Conn,
 		Create:     pulumi.String("echo 'SSH is ready'"),
-	}, pulumi.DependsOn([]pulumi.Resource{vm_stack.WorkerUbuntuNode, getJoinTokenCmd})) // Depends on the VM
+	}, pulumi.DependsOn([]pulumi.Resource{vm_stack.WorkerUbuntuNode, getJoinTokenCmd}))
 	if err != nil {
 		return &kubernetes.Provider{}, err
 	}
@@ -125,7 +120,7 @@ func SetupKube(ctx *pulumi.Context, vm_stack IncusNodes) (*kubernetes.Provider, 
 			echo "Installing K3s on worker (Ubuntu)..."
 			# We pass the master URL and Token as environment variables
 			curl -sfL https://get.k3s.io | K3S_URL=%s K3S_TOKEN=%s sh -
-		`, k3sUrl, getJoinTokenCmd.Stdout), // <-- Uses the token here
+		`, k3sUrl, getJoinTokenCmd.Stdout),
 	}, pulumi.DependsOn([]pulumi.Resource{worker1SshReady, getJoinTokenCmd}))
 	if err != nil {
 		return &kubernetes.Provider{}, err
@@ -140,7 +135,7 @@ func SetupKube(ctx *pulumi.Context, vm_stack IncusNodes) (*kubernetes.Provider, 
 	worker2SshReady, err := remote.NewCommand(ctx, "wait-for-worker2-ssh", &remote.CommandArgs{
 		Connection: worker2Conn,
 		Create:     pulumi.String("echo 'SSH is ready'"),
-	}, pulumi.DependsOn([]pulumi.Resource{vm_stack.WorkerAlmaNode, getJoinTokenCmd})) // Depends on the VM
+	}, pulumi.DependsOn([]pulumi.Resource{vm_stack.WorkerAlmaNode, getJoinTokenCmd}))
 	if err != nil {
 		return &kubernetes.Provider{}, err
 	}
@@ -152,15 +147,14 @@ func SetupKube(ctx *pulumi.Context, vm_stack IncusNodes) (*kubernetes.Provider, 
 			echo "Installing K3s on worker (Ubuntu)..."
 			# We pass the master URL and Token as environment variables
 			curl -sfL https://get.k3s.io | K3S_URL=%s K3S_TOKEN=%s sh -
-		`, k3sUrl, getJoinTokenCmd.Stdout), // <-- Uses the token here
+		`, k3sUrl, getJoinTokenCmd.Stdout),
 	}, pulumi.DependsOn([]pulumi.Resource{worker2SshReady, getJoinTokenCmd}))
 	if err != nil {
 		return &kubernetes.Provider{}, err
 	}
 
-	// === NEW: Instantiate the Kubernetes Provider ===
 	// We pass the stdout of the getKubeconfigCmd *directly* to the provider.
 	return kubernetes.NewProvider(ctx, "k8s-provider", &kubernetes.ProviderArgs{
 		Kubeconfig: getKubeconfigCmd.Stdout,
-	}, pulumi.DependsOn([]pulumi.Resource{kubeInitCmd, worker1JoinCmd, worker2JoinCmd})) // Depends on CN
+	}, pulumi.DependsOn([]pulumi.Resource{kubeInitCmd, worker1JoinCmd, worker2JoinCmd}))
 }
